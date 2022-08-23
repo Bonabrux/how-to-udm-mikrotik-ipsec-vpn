@@ -1,130 +1,175 @@
-# How to create an IPsec VPN between Unifi USG and Mikrotik firewalls
-* Hardware and software
-    * Unifi USG XG-8 v4.4.44.5213871
-    * Unifi Controller version 5.12.35
-    * Mikrotik CCR1036-8G-2S+ with RouterOS v6.44.5
-    
-* Sources:
-    * EdgeRouter to MikroTik IPSec VPN Setup by Willie Howe
-        * https://www.youtube.com/watch?v=70EIA4bF820
-    * UniFi - USG/UDM VPN: How to Configure Site-to-Site VPN
-        * https://help.ubnt.com/hc/en-us/articles/360002426234-UniFi-USG-UDM-VPN-How-to-Configure-Site-to-Site-VPN
-        
-## Mikrotik configuration in WebFig interface
-### Select: IP -> IPsec -> Peers
+# How to create an IPsec VPN between Unifi UDM and Mikrotik firewalls
 
-| Add New | |
-| - | - |
-| Enabled | checked
-| Name | USG-01
-| Address |	USG WAN address
-| Port | empty
-| Local Address | Mikrotik WAN address
-| Auth. Method | pre shared key
-| Exchange Mode | main
-| Passive | uncheked
-| Send INITIAL_CONTACT | checked
+Hardware and software used
+* UniFi OS UDM 1.12.22
+* Unifi Network 7.2.92
+* Mikrotik RouterOS v7.4
+
+## Notes
+You will find these placeholders in the configuration below and you need to replace the values
+* "WAN IP of UDM" - The public IP of location with UDM
+* "WAN IP of Mikrotik" - The public IP of location with Mikrotik
+* "YOUR SECRET KEY" - a very long password atleast 64 characters long, best to use some password generator
+
+## DH Groups explained
+mapping for Mikrotik to UDM (Google: Diffie-Hellman Groups)
+* modp1024 = DH Group 2
+* modp2048 = DH Group 14
+
+## Mikrotik configuration in WebFig interface
 
 ### Select: IP -> IPsec -> Profiles
 | New Profile | |
 | - | - |
-| Name | profile01
-| Hash Algorithms | sha1
-| Encryption Algorithm | aes-128
-| DH Group | modp1024 (=DH Group 2), modp2048
-| Proposal Check | obey
-| Lifetime | 1d 00:00:00
-| Lifebytes | empty
-| Nat Traversal | uncheck (or check?)
-| DPD Interval | 60s
-| DPD Maximum Failures | 5
+| Name | UDM-profile |
+| Hash Algorithms | sha1 |
+| PRF Algorithms | auto |
+| Encryption Algorithm | aes-128 |
+| DH Group | modp1024, modp2048 |
+| Proposal Check | obey |
+| Lifetime | 1d 00:00:00 |
+| Lifebytes | empty |
+| Nat Traversal | uncheck |
+| DPD Interval | 60 |
+| DPD Maximum Failures | 5 |
+
+### Select: IP -> IPsec -> Peers
+| Add New | |
+| - | - |
+| Name | UDM-01 |
+| Address |	"WAN IP of UDM" |
+| Port | empty |
+| Local Address | empty (or LAN IP of Mikrotik if behind NAT) |
+| Profile | UDM-profile |
+| Exchange Mode | IKE2 |
+| Passive | uncheked |
+| Send INITIAL_CONTACT | checked |
 
 ### Select: IP -> IPsec -> Identities
 | Add New | |
 | - | - |
-| Enabled |	checked
-| Peer | USG-01
-| Auth. Method |			pre shared key
-| Secret | paste your secret
-| Policy Template Group | default
-| Notrack Chain | empty
-| My ID Type | auto
-| Remote ID Type | auto
-| Match By | remote id
-| Mode Configuration | empty
-| Generate Policy | no
+| Peer | UDM-01 |
+| Auth. Method | pre shared key |
+| Secret | "YOUR SECRET KEY" |
+| Policy Template Group | default |
+| Notrack Chain | empty |
+| My ID Type | auto (if router behind NAT use 'address') |
+| My ID | empty (if router behind NAT use "WAN IP of Mikrotik") |
+| Remote ID Type | auto |
+| Match By | remote id |
+| Mode Configuration | empty |
+| Generate Policy | no |
 
 ### Select: IP -> IPsec -> Proposals
-
-| Check default | |
+| Add New | |
 | - | - |
-| Enabled | checked
-| Name | default
-| Auth. Algorithms | sha1
-| Encr. Algorithms | aes-128 cbc
-| | aes-256 cbc
-| | aes-128 ctr
-| Lifetime | empty
-| PFS Group | modp1024
+| Name | UDM proposal |
+| Auth. Algorithms | sha1 |
+| Encr. Algorithms | aes-128 cbc |
+| Lifetime | 00:30:00 |
+| PFS Group | modp2048 |
 
 ### Select: IP -> IPsec -> Policies
-* Disable default
-
 | Add New IPsec Policy | |
 | - | - |
-| Enabled | checked |
-| Src. Address | Mikrotik internal LAN network address (the whole network e.g. 192.168.1.0/24) |
+| General Tab | |
+| Peer | UDM-01 |
+| Tunnel | checked |
+| Src. Address | Mikrotik internal LAN network address (the whole network e.g. 10.0.5.0/24) |
 | Src. Port | empty
-| Dst. Address | USG internal LAN network address
-| Dst. Port | empty
-| Protocol | 255 (all)
-| Action | encrypt
-| Level | unique ( Default was "require", but to establish connection with multiple network subnets it needs to be "unique". More information in https://blog.bravi.org/?p=1209 )
-| IPsec Protocols | esp
-| Tunnel | checked
-| SA Src. Address | Mikrotik WAN address
-| SA Dst. Address | USG WAN address
-| Proposal | default
+| Dst. Address | UDM internal LAN network address (the whole network e.g. 192.168.5.0/24) |
+| Dst. Port | empty |
+| Template | unchecked |
+| Action tab | |
+| Action | encrypt |
+| Level | unique |
+| IPsec Protocols | esp |
+| Proposal | UDM proposal |
+| Status tab | (this will be populated once the connection is established, fields are read only) |
+| PH2 Count | 1 |
+| PH2 State | established |
+| SA Src. Address | WAN IP of Mikrotik location (or LAN IP of router if behind NAT) |
+| SA Dst. Address | WAN IP of UDM location |
+
+### Select: IP -> Firewall -> Filter Rules
+| New Firewall Rule | |
+| - | - |
+| Chain | input |
+| Protocol | 50 (ipsec-esp) |
+| In. Interface | unchecked, ether1 (could be different for you, this is the port on the router where the internet connection comes in) |
+| Action | accept |
+| Comment | allow L2TP VPN (ipsec-esp) |
+
+| New Firewall Rule | |
+| - | - |
+| Chain | input |
+| Protocol | 17 (udp) |
+| Dst. Port | 500, 1701, 4500 |
+| In. Interface | unchecked, ether1 (could be different for you, this is the port on the router where the internet connection comes in) |
+| Action | accept |
+| Comment | allow L2TP VPN (500,4500,1701/udp) |
+
+* Move the rule to the top of the firewall Filter rules after the "defconf: accept established,related,untracked" rule.
 
 ### Select: IP -> Firewall -> NAT
 | New NAT Rule | |
 | - | - |
-| Chain | srcnat
-| Src. Address | LAN network of Mikrotik
-| Dst. Address | LAN network of USG
-| Action | Accept
+| Chain | srcnat |
+| Src. Address | LAN network of Mikrotik (e.g. 10.0.5.0/24) |
+| Dst. Address | LAN network of UDM (e.g. 192.168.5.0/24) |
+| Action | accept |
 
-* Move the rule to the top of the firewall rules.
+* Move the rule to the top of the firewall NAT rules.
 
-## USG configuration (version 5.12.35)
-### Settings -> VPN -> Create New VPN Connection
-| Configurations | |
+## UDM configuration
+### Settings -> Teleport & VPN -> VPN Server
+| Configuration | |
 | - | - |
-| Name| mikrotik-usg-vpn |
-| Purpose | Site-to-Site VPN |
-| VPN Type | Manual IPsec |
-| Enabled | check, Enable this Site-to-Site VPN |
-| Remote Subnets | Mikrotik subnets |
-| Route Distance | 30 was default | 
-| Peer IP | WAN IP of Mikrotik |
-| Local WAN IP | WAN IP of USG |
-| Pre-Shared Key | secret key |
-| IPsec Profile | Customized | 
-| **Advanced Options** | |
-| Key Exchange Version | IKEv1
-| Encryption | AES-128
-| Hash | SHA1
-| DH Group | 2
-| PFS | checked, Enable prefect forward secrecy
-| Dynamic Routing | unchecked, Enable dynamic routing
+| VPN Server | Enabled (checked) |
+| VPN Protocol | L2TP |
+| Pre-shared Key | "YOUR SECRET KEY for UDM" (not the same as for Mikrotik) |
+| UniFi Gateway IP | "WAN IP of UDM" |
+| If you want to also connect with VPN client to your UDM add a user for (Windows VPN clients enable MSCHAPv2 on network adapter). | |
+| User Authentication | Create a new user, enter username and password for user (make it complex) |
+| Advanced Configuration | Manual |
+| Network name | VPN |
+| User Access List (RADIUS Profiler) | Default |
+| Gateway/Subnet | (e.g. 192.168.6.1/24) (Can't be the same as local IP range of UDM) |
+| Name Server | unchecked |
+| WINS Server | unchecked |
+| Site-to-Site VPN | Enabled (checked) |
+| Require Strong Authentication | Enabled (checked) - this is where you need MSCHAPv2 |
+| Allow weak ciphers | Enabled (checked) |
+
+### Settings -> Teleport & VPN -> Create Site-to-site VPN
+| Configuration | |
+| - | - |
+| Name| Mikrotik-01 |
+| VPN Protocol | Manual IPsec |
+| Pre-shared Key | "YOUR SECRET KEY" |
+| UniFi Gateway IP | "WAN IP of UDM" |
+| Shared Remote Subnets | Mikrotik LAN subnet (e.g. 10.0.5.0/24) |
+| Remote IP | "WAN IP of Mikrotik" |
+| Advanced | Manual |
+| IPsec Profile | Customized |
+| Key Echange Version | IKEv2 |
+| Encryption | AES-128 |
+| Hash | SHA1 |
+| IKE DH Group | 14 |
+| ESP DH Group | 14 |
+| Perfect Forward Secrecy (PFS) | Enabled (checked) |
+| Route-Based VPN | Enabled (checked) |
+| Route Distance | 30 |
 
 ## Mikrotik IPsec -> Installed SAs
 * Something like this should show up when connection is up
 
-| | SPI	| Src. Address | Dst. Address |Auth. Algorithm | Encr. Algorithm | Encr. Key Size | Current Bytes
+| | SPI	| Src. Address | Dst. Address |Auth. Algorithm | Encr. Algorithm | Encr. Key Size | Current Bytes |
 | - | - | - | - | - | - | - | - |
-| EH | 4cbfd50 | 62.x.y.z | 83.x.y.z | sha1 | aes cbc | 128 | 15540	
-| EH | c0a27199 | 83.x.y.z | 62.x.y.z | sha1 | aes cbc | 128 | 13440
+| EH | 4cbfd50 | 62.x.y.z | 83.x.y.z | sha1 | aes cbc | 128 | 0 |
+| EH | c0a27199 | 83.x.y.z | 62.x.y.z | sha1 | aes cbc | 128 | 3440 |
 
 ## Ping
-* You should be able to ping both ways now.
+* You should be able to ping both ways from each location.
+
+If you found this guide helpful, you can tip me some ETH: 0x777777777EEcCF14E5fcb314D9929b9937BaF652
