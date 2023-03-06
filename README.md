@@ -171,5 +171,3 @@ mapping for Mikrotik to UDM (Google: Diffie-Hellman Groups)
 
 ## Ping
 * You should be able to ping both ways from each location.
-
-If you found this guide helpful, you can tip me some ETH: 0x777777777EEcCF14E5fcb314D9929b9937BaF652
