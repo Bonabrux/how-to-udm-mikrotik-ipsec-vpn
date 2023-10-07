@@ -1,8 +1,8 @@
 # How to create an IPsec VPN between Unifi UDM and Mikrotik firewalls
 
 Hardware and software used
-* UniFi OS UDM 1.12.22
-* Unifi Network 7.2.92
+* UniFi OS 3.1.16
+* Unifi Network 7.2.92 - 7.5.176
 * Mikrotik RouterOS v7.4
 
 ## Notes
