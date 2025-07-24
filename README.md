@@ -1,9 +1,9 @@
 # How to create an IPsec VPN between Unifi UDM and Mikrotik firewalls
 
 Hardware and software used
-* UniFi OS 3.1.16 - 3.2.7
-* Unifi Network 7.2.92 - 8.0.26
-* Mikrotik RouterOS v7.4
+* UniFi OS 4.3.6
+* Unifi Network 9.3.43
+* Mikrotik RouterOS v7.17
 
 ## Notes
 You will find these placeholders in the configuration below and you need to replace the values
@@ -122,34 +122,18 @@ mapping for Mikrotik to UDM (Google: Diffie-Hellman Groups)
 * Move the rule to the top of the firewall NAT rules.
 
 ## UDM configuration
-### Settings -> Teleport & VPN -> VPN Server
-| Configuration | |
-| - | - |
-| VPN Server | Enabled (checked) |
-| VPN Protocol | L2TP |
-| Pre-shared Key | "YOUR SECRET KEY for UDM" (not the same as for Mikrotik) |
-| UniFi Gateway IP | "WAN IP of UDM" |
-| If you want to also connect with VPN client to your UDM add a user for (Windows VPN clients enable MSCHAPv2 on network adapter). | |
-| User Authentication | Create a new user, enter username and password for user (make it complex) |
-| Advanced Configuration | Manual |
-| Network name | VPN |
-| User Access List (RADIUS Profiler) | Default |
-| Gateway/Subnet | (e.g. 192.168.6.1/24) (Can't be the same as local IP range of UDM) |
-| Name Server | unchecked |
-| WINS Server | unchecked |
-| Site-to-Site VPN | Enabled (checked) |
-| Require Strong Authentication | Enabled (checked) - this is where you need MSCHAPv2 |
-| Allow weak ciphers | Enabled (checked) |
-
-### Settings -> Teleport & VPN -> Create Site-to-site VPN
+### Settings -> VPN -> Create Site-to-site VPN
 | Configuration | |
 | - | - |
 | Name| Mikrotik-01 |
 | VPN Protocol | Manual IPsec |
 | Pre-shared Key | "YOUR SECRET KEY" |
 | UniFi Gateway IP | "WAN IP of UDM" |
-| Shared Remote Subnets | Mikrotik LAN subnet (e.g. 10.0.5.0/24) |
-| Remote IP | "WAN IP of Mikrotik" |
+| Remote IP / Hostname | "WAN IP or FQDN of Mikrotik" |
+| VPN Method | Routed Based |
+| Tunnel IP | Unchecked |
+| Remote Network | Static |
+| Add your Remote Subnets | Mikrotik LAN subnet (e.g. 10.0.5.0/24) |
 | Advanced | Manual |
 | IPsec Profile | Customized |
 | Key Echange Version | IKEv2 |
@@ -158,7 +142,8 @@ mapping for Mikrotik to UDM (Google: Diffie-Hellman Groups)
 | IKE DH Group | 14 |
 | ESP DH Group | 14 |
 | Perfect Forward Secrecy (PFS) | Enabled (checked) |
-| Route-Based VPN | Enabled (checked) |
+| Local Authentication ID | if Auto your WAN IP will be used, check with what you configured as expected in Mikrotik IP -> IPsec -> Identities |
+| Remote Authentication ID | if Auto your Remote IP or FQDN will be used, check with what you configured as expected in Mikrotik IP -> IPsec -> Identities |
 | Route Distance | 30 |
 
 ## Mikrotik IPsec -> Installed SAs
